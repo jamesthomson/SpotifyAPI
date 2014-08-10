@@ -1,5 +1,4 @@
-#library(XML)
-#library(rjson)
+
 
 #' Get Artists
 #'
@@ -16,33 +15,34 @@ getArtists<-function(artists) {
 if (Sys.info()[1]=="Windows"){
               out<-NULL
               for (i in c(1:length(artists))) {
-                  eval(parse(text=paste0("search<-readLines('http://ws.spotify.com/search/1/artist?q=", artists[i], "')")))
-                  searchxml<-xmlToList(search)
+                  eval(parse(text=paste0("search<-fromJSON(file=\"https://api.spotify.com/v1/search?q=", gsub(" ", "%20", artists[i]), "&type=artist\")")))
+                  eval(parse(text=paste0("search<-readLines('https://api.spotify.com/v1/search?q=", gsub(" ", "%20", artists[i]), "&type=artist')")))
                   temp<-data.frame(
-                  artist=as.character(searchxml$artist$name),
-                  artist_id=substring(searchxml$artist$.attrs, as.integer(gregexpr(":", searchxml$artist$.attrs)[[1]])[2]+1, nchar(searchxml$artist$.attrs)),
-                  artist_pop=as.numeric(searchxml$artist$popularity)*100
+                  artist=search$artists$items[[1]]$name,
+                  artist_id=search$artists$items[[1]]$id,
+                  artist_pop=search$artists$items[[1]]$popularity
                                       )
                   rownames(temp)<-NULL
                   out<-rbind(out, temp)
                                               }
                             }
 else {
-            out<-NULL
-            for (i in c(1:length(artists))) {
-            eval(parse(text=paste0("url<-'http://ws.spotify.com/search/1/artist?q=", artists[i], "'")))
-            save_file<-'temp.txt'
-            download.file(url, save_file, method = "wget", quiet=TRUE)
-            search <- readLines(save_file)
-            file.remove(save_file)
-            searchxml<-xmlToList(search)
-            temp<-data.frame(
-            artist=as.character(searchxml$artist$name),
-            artist_id=substring(searchxml$artist$.attrs, as.integer(gregexpr(":", searchxml$artist$.attrs)[[1]])[2]+1, nchar(searchxml$artist$.attrs)),
-            artist_pop=as.numeric(searchxml$artist$popularity)*100
-            )
-            rownames(temp)<-NULL
-            out<-rbind(out, temp)
+                  out<-NULL
+                  for (i in c(1:length(artists))) {
+                  eval(parse(text=paste0("url<-'https://api.spotify.com/v1/search?q=", gsub(" ", "%20", artists[i]), "&type=artist'")))
+                  save_file<-'temp.txt'
+                  download.file(url, save_file, method = "wget", quiet=TRUE)
+                  fp <- file.path(save_file)
+                  search <- fromJSON(file = fp)
+                  file.remove(save_file)
+                  
+                  temp<-data.frame(
+                  artist=search$artists$items[[1]]$name,
+                  artist_id=search$artists$items[[1]]$id,
+                  artist_pop=search$artists$items[[1]]$popularity
+                  )
+                  rownames(temp)<-NULL
+                  out<-rbind(out, temp)
                                         }             
 }
 
@@ -113,6 +113,146 @@ getRelatedArtists<-function(getArtistsOutput) {
   }
   return(artists_relate)
 }
+
+
+
+
+
+
+
+#' Get Artists Albums
+#'
+#' Creates a data frame containing details of an artists albums taken from the output from getArtists. This is limited by Spotify to a maximum of 50 albums.
+#'
+#' @param getArtistsOutput A data.frame object produced from the getArtists function
+#' @param country the country the albums are availble in by default GB
+#' @param albumType the album types to select. By defult album. Options: album, single, compilation, appears_on 
+#' @param cleanDups some results contain duplicate albums due to reissues. TRUE by default will clean this up
+#' @author James Thomson
+#' @examples getArtistsAlbums(getArtists("The Veils"))
+
+
+getArtistsAlbums<-function(getArtistsOutput, country="GB", albumType="album", cleanDups=TRUE) {
+  
+  if (Sys.info()[1]=="Windows"){  
+    
+    albums<-data.frame(artist=NULL,artist_id=NULL,album=NULL, album_id=NULL)
+    for (i in c(1:nrow(getArtistsOutput))) {
+      eval(parse(text=paste0("list<-fromJSON(file=\"https://api.spotify.com/v1/artists/", getArtistsOutput[i,2], "/albums?album_type=", albumType, "&limit=50&country=", country, "\")")))
+      
+      for (j in c(1:length(list$items))){
+        temp<-data.frame(
+          artist=getArtistsOutput[i,1],
+          artist_id=getArtistsOutput[i,2], 
+          album=list$items[[j]]$name,
+          album_id=list$items[[j]]$id
+        )
+        albums<-rbind(albums, temp)
+      }
+    }  
+  }
+  
+  
+  else {  
+    albums<-data.frame(artist=NULL,artist_id=NULL,album=NULL, album_id=NULL)
+    
+    for (i in c(1:nrow(getArtistsOutput))) { 
+      eval(parse(text=paste0("url<-'https://api.spotify.com/v1/artists/", getArtistsOutput[i,2], "/albums?album_type=", albumType, "&limit=50&country=", country,"'")))
+      save_file<-'temp.txt'
+      download.file(url, save_file, method = "wget", quiet=TRUE)
+      fp <- file.path(save_file)
+      list <- fromJSON(file = fp)
+      file.remove(save_file)  
+      
+      for (j in c(1:length(list$items))){
+        temp<-data.frame(
+          artist=getArtistsOutput[i,1],
+          artist_id=getArtistsOutput[i,2], 
+          album=list$items[[j]]$name,
+          album_id=list$items[[j]]$id
+        )
+        albums<-rbind(albums, temp)
+      }
+    }
+  }
+  if (cleanDups==TRUE){albums<-albums[!duplicated(albums$album), ]}
+  return(albums)
+}
+
+
+
+#' Get Album Tracks
+#'
+#' Creates a data frame containing details of an artists albums taken from the output from getArtists. This is limited by Spotify to a maximum of 50 albums.
+#'
+#' @param getArtistsOutput A data.frame object produced from the getArtists function
+#' @param country the country the albums are availble in by default GB
+#' @param albumType the album types to select. By defult album. Options: album, single, compilation, appears_on 
+#' @param cleanDups some results contain duplicate albums due to reissues. TRUE by default will clean this up
+#' @author James Thomson
+#' @examples tracks<-getAlbumsTracks(getArtistsAlbums(getArtists("The Veils")))
+
+
+getAlbumsTracks<-function(getArtistsAlbumsOutput) {
+  
+  if (Sys.info()[1]=="Windows"){  
+    
+    albumtracks<-data.frame(artist=NULL,artist_id=NULL,album=NULL, album_id=NULL, track=NULL, track_id=NULL, track_number=NULL, track_length=NULL, preview_url=NULL)
+    
+    for (i in c(1:nrow(getArtistsAlbumsOutput))) {
+      eval(parse(text=paste0("list<-fromJSON(file=\"https://api.spotify.com/v1/albums/", getArtistsAlbumsOutput[i,4], "/tracks?limit=50\")")))
+      
+      for (j in c(1:length(list$items))){
+        temp<-data.frame(
+          artist=getArtistsAlbumsOutput[i,1],
+          artist_id=getArtistsAlbumsOutput[i,2], 
+          album=getArtistsAlbumsOutput[i,3], 
+          album_id=getArtistsAlbumsOutput[i,4],          
+          track=list$items[[j]]$name,
+          track_id=list$items[[j]]$id,
+          track_number=list$items[[j]]$track_number,
+          track_length=format(.POSIXct(list$items[[j]]$duration_ms/1000,tz="GMT"), "%M:%S"),
+          preview_url=list$items[[j]]$preview_url
+        )
+        albumtracks<-rbind(albumtracks, temp)
+      }
+    }  
+  }
+  
+  
+  else {  
+    albumtracks<-data.frame(artist=NULL,artist_id=NULL,album=NULL, album_id=NULL, track=NULL, track_id=NULL, track_number=NULL, track_length=NULL, preview_url=NULL)
+    
+    for (i in c(1:nrow(getArtistsAlbumsOutput))) { 
+      eval(parse(text=paste0("url<-'https://api.spotify.com/v1/albums/", getArtistsAlbumsOutput[i,4], "/tracks?limit=50'")))
+      save_file<-'temp.txt'
+      download.file(url, save_file, method = "wget", quiet=TRUE)
+      fp <- file.path(save_file)
+      list <- fromJSON(file = fp)
+      file.remove(save_file)  
+      
+      for (j in c(1:length(list$items))){
+        temp<-data.frame(
+          artist=getArtistsAlbumsOutput[i,1],
+          artist_id=getArtistsAlbumsOutput[i,2], 
+          album=getArtistsAlbumsOutput[i,3], 
+          album_id=getArtistsAlbumsOutput[i,4],          
+          track=list$items[[j]]$name,
+          track_id=list$items[[j]]$id,
+          track_number=list$items[[j]]$track_number,
+          track_length=format(.POSIXct(list$items[[j]]$duration_ms/1000,tz="GMT"), "%M:%S"),
+          preview_url=list$items[[j]]$preview_url
+        )
+        albumtracks<-rbind(albumtracks, temp)
+      }
+    }
+  }
+
+  return(albumtracks)
+}
+
+
+
 
 
 
@@ -199,9 +339,6 @@ visRelatedArtists<-function(artist, steps=2, output_file) {
   
   nodes<-data.frame(name=artists$artist, group=artists$step, popularity=artists$artist_pop)
   links<-data.frame(source=artists_relate$from_artist, target=artists_relate$to_artist, value=1, distance=40+artists_relate$position*5)
-
-  
-  
   
   
   jsonConvert<-function(nodes, links){
@@ -260,9 +397,6 @@ visRelatedArtists<-function(artist, steps=2, output_file) {
     <script type=\"application/json\" id=\"mis\">"
     
     footer<-"</script>
-    
-    
-    
     
     <script>
     //Constants for the SVG
@@ -365,22 +499,215 @@ visRelatedArtists<-function(artist, steps=2, output_file) {
     close(fileConn)
     
 }     
-  
     
-  
-  
   json<-jsonConvert(nodes,links)
   Force(json, file_out=output_file)
-
-  
-  
-  
-  
-  
-  
+    
   return(list(artists=artists, relationships=artists_relate, json=json))
   
 }
+
+
+
+
+
+
+
+#' Visualize Artists Album History
+#'
+#' Creates a object containing an artists back catalogue and a visualisation of their back catalogue at the file location specified
+#'
+#' @param artist an artist
+#' @param output_file an output location and filename
+#' @author James Thomson
+#' @examples out<-visDiscography(artist="David Bowie", output_file="Disco.html")
+#' 
+#' 
+
+
+
+visDiscography<-function(artist,  output_file) {
+  
+  jsonNestedData<-function(structure, values=NULL, top_label="Top") {
+    
+    if (is.null(values)) {
+      
+      #bottom level   
+      labels<-data.frame(table(structure[,ncol(structure)-1]))
+      for (i in c(1:nrow(labels))) {
+        items<-structure[structure[,ncol(structure)-1]==labels[i,1],ncol(structure)]
+        eval(parse(text=paste0(gsub(" ", "_",gsub("[[:punct:]]","",labels[i,1])),"<-list(name=\"", labels[i,1], "\", children=list(", paste0("list(name=as.character(items[", c(1:length(items)), "]))", collapse=","),  "))")))
+      }
+      
+      #iterate through other levels
+      for (c in c((ncol(structure)-2):1)) {
+        labels<-data.frame(table(structure[,c]))        
+        lookup<-data.frame(table(structure[,c], structure[,c+1]))
+        lookup2<-lookup[lookup$Freq!=0,]
+        for (i in c(1:nrow(labels))) {
+          eval(parse(text=paste0(gsub(" ", "_",gsub("[[:punct:]]","",labels[i,1])),
+                                 "<-list(name=\"", 
+                                 labels[i,1], 
+                                 paste0("\", children=list(", 
+                                        paste0(gsub(" ", "_", gsub("[[:punct:]]","",lookup2[lookup2$Var1==labels[i,1],2])), collapse=","), ")"),
+                                 ")")
+          ))
+        }
+      }
+      
+      #final top level
+      labels<-data.frame(table(structure[,1]))
+      eval(parse(text=paste0("Top<-list(name=\"", top_label,"\" , children=list(", paste(gsub(" ", "_",gsub("[[:punct:]]","",labels[i,1])), collapse=","), ")",")")))           
+      
+    } else {
+      
+      
+      
+      #bottom level   
+      labels<-data.frame(table(structure[,ncol(structure)-1]))
+      for (i in c(1:nrow(labels))) {
+        items<-structure[structure[,ncol(structure)-1]==labels[i,1],ncol(structure)]
+        vals<-values[structure[,ncol(structure)-1]==labels[i,1]]
+        eval(parse(text=paste0(gsub(" ", "_",gsub("[[:punct:]]","",labels[i,1])),"<-list(name=\"", labels[i,1], "\", children=list(", paste0("list(name=as.character(items[", c(1:length(items)), "]), value=vals[",c(1:length(items)),"])", collapse=","),  "))")))
+      }
+      
+      #iterate through other levels
+      for (c in c((ncol(structure)-2):1)) {
+        labels<-data.frame(table(structure[,c]))        
+        lookup<-data.frame(table(structure[,c], structure[,c+1]))
+        lookup2<-lookup[lookup$Freq!=0,]
+        for (i in c(1:nrow(labels))) {
+          eval(parse(text=paste0(gsub(" ", "_",gsub("[[:punct:]]","",labels[i,1])),
+                                 "<-list(name=\"", 
+                                 labels[i,1], 
+                                 paste0("\", children=list(", 
+                                        paste0(gsub(" ", "_",gsub("[[:punct:]]","", lookup2[lookup2$Var1==labels[i,1],2])), collapse=","), ")"),
+                                 ")")
+          ))
+        }
+      }
+      
+      #final top level
+      labels<-data.frame(table(structure[,1]))
+      eval(parse(text=paste0("Top<-list(name=\"", top_label,"\" , children=list(", paste(gsub(" ", "_", labels[,1]), collapse=","), ")",")")))           
+      
+    }  
+    
+    json<-toJSON(Top)
+    return(list(Type="json:nested", json=json))
+  }
+  
+  
+  
+  
+  D3Dendro<-function(JSON, text=15, height=800, width=1000, file_out){
+    
+    if (JSON$Type!="json:nested"){stop("Incorrect json type for this D3")}
+    
+    header<-paste0("<!DOCTYPE html>
+                   <meta charset=\"utf-8\">
+                   <style>
+                   
+                   .node circle {
+                   fill: #fff;
+                   stroke: steelblue;
+                   stroke-width: 1.5px;
+                   }
+                   
+                   .node {
+                   font: ",text , "px sans-serif;
+                   }
+                   
+                   .link {
+                   fill: none;
+                   stroke: #ccc;
+                   stroke-width: 1.5px;
+                   }
+                   
+                   </style>
+                   <body>
+                   <script src=\"http://d3js.org/d3.v3.min.js\"></script>
+                   
+                   <script type=\"application/json\" id=\"data\">")
+    
+    
+    footer<-paste0("</script>
+                   
+                   
+                   
+                   
+                   <script>
+                   
+                   var data = document.getElementById('data').innerHTML;
+                   root = JSON.parse(data);
+                   
+                   
+                   var width = ", width, ",
+                   height = ", height, ";
+                   
+                   var cluster = d3.layout.cluster()
+                   .size([height-100, width - 500]);
+                   
+                   var diagonal = d3.svg.diagonal()
+                   .projection(function(d) { return [d.y, d.x]; });
+                   
+                   var svg = d3.select(\"body\").append(\"svg\")
+                   .attr(\"width\", width)
+                   .attr(\"height\", height)
+                   .append(\"g\")
+                   .attr(\"transform\", \"translate(40,0)\");
+                   
+                   
+                   var nodes = cluster.nodes(root),
+                   links = cluster.links(nodes);
+                   
+                   var link = svg.selectAll(\".link\")
+                   .data(links)
+                   .enter().append(\"path\")
+                   .attr(\"class\", \"link\")
+                   .attr(\"d\", diagonal);
+                   
+                   var node = svg.selectAll(\".node\")
+                   .data(nodes)
+                   .enter().append(\"g\")
+                   .attr(\"class\", \"node\")
+                   .attr(\"transform\", function(d) { return \"translate(\" + d.y + \",\" + d.x + \")\"; })
+                   
+                 node.append(\"circle\")
+                 .attr(\"r\", 4.5)
+                 .on(\"click\", function(d,i) { window.open(d.value); });
+                   
+                   node.append(\"text\")
+                   .attr(\"dx\", function(d) { return d.children ? 50 : 8; })
+                   .attr(\"dy\", function(d) { return d.children ? 20 : 4; })
+                   .style(\"text-anchor\", function(d) { return d.children ? \"end\" : \"start\"; })
+                   .text(function(d) { return d.name; });
+                   
+                   
+                   d3.select(self.frameElement).style(\"height\", height + \"px\");
+                   
+                   </script>") 
+    
+    fileConn<-file(file_out)
+    writeLines(paste0(header, JSON$json, footer), fileConn)
+    close(fileConn)
+    
+  }
+  
+  
+  
+  
+  tracks<-getAlbumsTracks(getArtistsAlbums(getArtists(artist)))
+  json<-jsonNestedData(tracks[,c(1,3,5)], values=tracks[,9], top_label="Discography")
+  D3Dendro(json, file_out=output_file)
+    
+  return(list(discography=tracks,json=json))
+  
+  }
+
+
+
+
 
 
 
