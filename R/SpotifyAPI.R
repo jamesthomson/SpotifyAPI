@@ -600,7 +600,7 @@ visDiscography<-function(artist,  output_file) {
   
   
   
-  D3Dendro<-function(JSON, text=15, height=800, width=1000, file_out){
+  D3Dendro<-function(JSON, text=15, height=3000, width=1000, file_out){
     
     if (JSON$Type!="json:nested"){stop("Incorrect json type for this D3")}
     
@@ -608,14 +608,8 @@ visDiscography<-function(artist,  output_file) {
                    <meta charset=\"utf-8\">
                    <style>
                    
-                   .node circle {
-                   fill: #fff;
-                   stroke: steelblue;
-                   stroke-width: 1.5px;
-                   }
-                   
-                   .node {
-                   font: ",text , "px sans-serif;
+                  .node {
+                   font: 15px sans-serif;
                    }
                    
                    .link {
@@ -623,6 +617,16 @@ visDiscography<-function(artist,  output_file) {
                    stroke: #ccc;
                    stroke-width: 1.5px;
                    }
+  			   
+                   .node circle {
+                   fill: #fff;
+				            transition:0s 0.05s;
+                   }
+				   
+				          .node circle:hover {
+                   fill: #FF0000;
+				            transition: 0s;
+                   } 
                    
                    </style>
                    <body>
@@ -673,9 +677,23 @@ visDiscography<-function(artist,  output_file) {
                    .attr(\"class\", \"node\")
                    .attr(\"transform\", function(d) { return \"translate(\" + d.y + \",\" + d.x + \")\"; })
                    
-                 node.append(\"circle\")
-                 .attr(\"r\", 4.5)
-                 .on(\"click\", function(d,i) { window.open(d.value); });
+  				 node.append(\"circle\")
+					 .attr(\"r\", 10)
+					 .style(\"opacity\", function(d) {if(d.children){return 0;} else {return 1;}})
+					 .on(\"click\", function(d) {if(!d.children) {window.open(d.value);} })
+					 ;
+				 
+				 
+					node.append(\"image\")
+					.attr(\"xlink:href\", function(d) {if(d.children){return \"http://www.clker.com/cliparts/W/i/K/w/1/D/glossy-orange-circle-icon-md.png\"} 
+														else {return \"http://www2.psd100.com/icon/2013/09/1101/Orange-play-button-icon-0911053546.png\"}})
+			
+					.attr(\"x\", -7)
+					.attr(\"y\", -7)
+					.attr(\"width\", 14)
+					.attr(\"height\", 14)
+					.on(\"click\", function(d) {if(!d.children) {window.open(d.value);} })
+					;
                    
                    node.append(\"text\")
                    .attr(\"dx\", function(d) { return d.children ? 50 : 8; })
