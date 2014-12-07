@@ -341,6 +341,67 @@ visRelatedArtists<-function(artist, steps=2, output_file) {
   links<-data.frame(source=artists_relate$from_artist, target=artists_relate$to_artist, value=1, distance=40+artists_relate$position*5)
   
   
+  
+  dfToJSON<-function(df, mode='vector'){
+    
+    colToList<-function(x, y){
+      
+      col.json<-list()
+      
+      #Build up a list of coordinates
+      
+      for (i in 1:length(x)){
+        
+        ni<-list(x=x[i], y=y[i])
+        col.json[[length(col.json)+1]]<-ni
+      }
+      
+      return(col.json)
+      
+    }
+    
+    
+    if (mode=='vector'){
+      
+      for.json<-list()
+      
+      for (j in 1:ncol(df)){
+        for.json[[length(for.json)+1]]<-list(name=colnames(df)[j] , data=df[,j])
+      }
+      
+    }
+    
+    if (mode=='coords') {
+      
+      for.json<-list()
+      
+      for (j in 2:ncol(df)){
+        for.json[[length(for.json)+1]]<-list(name=colnames(df)[j] , data=colToList(x=df[,1], y=df[,j]))
+      }
+      
+    }
+    
+    if (mode=='rowToObject') {
+      
+      for.json<-list()
+      
+      for (j in 1:nrow(df)){
+        for.json[[length(for.json)+1]]<-df[j,]
+      }
+      
+    }
+    
+    jj<-toJSON(for.json)
+    
+    return(jj)
+    
+  }
+  
+  
+  
+  
+  
+  
   jsonConvert<-function(nodes, links){
     
     nodes<-data.frame(lapply(nodes, as.character), stringsAsFactors=FALSE)
