@@ -11,44 +11,25 @@
 #' 
 
 getArtists<-function(artists) {
+  
+    out<-NULL
+    for (i in c(1:length(artists))) {
  
-if (Sys.info()[1]=="Windows"){
-              out<-NULL
-              for (i in c(1:length(artists))) {
-                  eval(parse(text=paste0("search<-fromJSON(file=\"https://api.spotify.com/v1/search?q=", gsub(" ", "%20", artists[i]), "&type=artist\")")))
-                  eval(parse(text=paste0("search<-readLines('https://api.spotify.com/v1/search?q=", gsub(" ", "%20", artists[i]), "&type=artist')")))
-                  temp<-data.frame(
-                  artist=search$artists$items[[1]]$name,
-                  artist_id=search$artists$items[[1]]$id,
-                  artist_pop=search$artists$items[[1]]$popularity
-                                      )
-                  rownames(temp)<-NULL
-                  out<-rbind(out, temp)
-                                              }
-                            }
-else {
-                  out<-NULL
-                  for (i in c(1:length(artists))) {
-                  eval(parse(text=paste0("url<-'https://api.spotify.com/v1/search?q=", gsub(" ", "%20", artists[i]), "&type=artist'")))
-                  save_file<-'temp.txt'
-                  download.file(url, save_file, method = "wget", quiet=TRUE)
-                  fp <- file.path(save_file)
-                  search <- fromJSON(file = fp)
-                  file.remove(save_file)
-                  
-                  temp<-data.frame(
-                  artist=search$artists$items[[1]]$name,
-                  artist_id=search$artists$items[[1]]$id,
-                  artist_pop=search$artists$items[[1]]$popularity
-                  )
-                  rownames(temp)<-NULL
-                  out<-rbind(out, temp)
-                                        }             
+      url<-paste0("https://api.spotify.com/v1/search?q=", gsub(" ", "%20", artists[i]), "&type=artist")
+      search<-content(GET(url))
+      temp<-data.frame(
+        artist=search$artists$items[[1]]$name,
+        artist_id=search$artists$items[[1]]$id,
+        artist_pop=search$artists$items[[1]]$popularity
+      )
+      rownames(temp)<-NULL
+      out<-rbind(out, temp)
+    }
+    
+  return(out)
 }
 
 
-return(out)
-}
 
 
 
@@ -65,13 +46,11 @@ return(out)
 #' 
 
 getRelatedArtists<-function(getArtistsOutput) {
-  
-  if (Sys.info()[1]=="Windows"){  
-    
+     
     artists_relate<-data.frame(from_artist=NULL,from_artist_id=NULL,position=NULL, to_artist=NULL, to_artist_id=NULL, to_artist_pop=NULL)
     for (i in c(1:nrow(getArtistsOutput))) {
-      eval(parse(text=paste0("related<-fromJSON(file=\"https://api.spotify.com/v1/artists/", getArtistsOutput[i,2], "/related-artists\")")))
-      
+      url<-paste0("https://api.spotify.com/v1/artists/", getArtistsOutput[i,2], "/related-artists")
+      related<-content(GET(url))
       for (j in c(1:20)){
         temp<-data.frame(
           from_artist=getArtistsOutput[i,1],
@@ -84,33 +63,8 @@ getRelatedArtists<-function(getArtistsOutput) {
         artists_relate<-rbind(artists_relate, temp)
       }
     }  
-  }
-  
-  
-  else {  
-    artists_relate<-data.frame(from_artist=NULL,from_artist_id=NULL,position=NULL, to_artist=NULL, to_artist_id=NULL, to_artist_pop=NULL)
-    for (i in c(1:nrow(getArtistsOutput))) {
-      
-      eval(parse(text=paste0("url<-'https://api.spotify.com/v1/artists/", getArtistsOutput[i,2], "/related-artists'")))
-      save_file<-'temp.txt'
-      download.file(url, save_file, method = "wget", quiet=TRUE)
-      fp <- file.path(save_file)
-      related <- fromJSON(file = fp)
-      file.remove(save_file)  
-      
-      for (j in c(1:20)){
-        temp<-data.frame(
-          from_artist=getArtistsOutput[i,1],
-          from_artist_id=getArtistsOutput[i,2], 
-          position=j,
-          to_artist=related$artists[[j]]$name,
-          to_artist_id=substring(related$artists[[j]]$uri, as.integer(gregexpr(":", related$artists[[j]]$uri)[[1]])[2]+1, nchar(related$artists[[j]]$uri)),
-          to_artist_pop=related$artists[[j]]$popularity
-        )
-        artists_relate<-rbind(artists_relate, temp)
-      }
-    }
-  }
+     
+
   return(artists_relate)
 }
 
@@ -134,12 +88,12 @@ getRelatedArtists<-function(getArtistsOutput) {
 
 getArtistsAlbums<-function(getArtistsOutput, country="GB", albumType="album", cleanDups=TRUE) {
   
-  if (Sys.info()[1]=="Windows"){  
+  
     
     albums<-data.frame(artist=NULL,artist_id=NULL,album=NULL, album_id=NULL)
     for (i in c(1:nrow(getArtistsOutput))) {
-      eval(parse(text=paste0("list<-fromJSON(file=\"https://api.spotify.com/v1/artists/", getArtistsOutput[i,2], "/albums?album_type=", albumType, "&limit=50&country=", country, "\")")))
-      
+      url<-paste0("https://api.spotify.com/v1/artists/", getArtistsOutput[i,2], "/albums?album_type=", albumType, "&limit=50&country=", country)
+      list<-content(GET(url))
       for (j in c(1:length(list$items))){
         temp<-data.frame(
           artist=getArtistsOutput[i,1],
@@ -150,34 +104,11 @@ getArtistsAlbums<-function(getArtistsOutput, country="GB", albumType="album", cl
         albums<-rbind(albums, temp)
       }
     }  
-  }
-  
-  
-  else {  
-    albums<-data.frame(artist=NULL,artist_id=NULL,album=NULL, album_id=NULL)
-    
-    for (i in c(1:nrow(getArtistsOutput))) { 
-      eval(parse(text=paste0("url<-'https://api.spotify.com/v1/artists/", getArtistsOutput[i,2], "/albums?album_type=", albumType, "&limit=50&country=", country,"'")))
-      save_file<-'temp.txt'
-      download.file(url, save_file, method = "wget", quiet=TRUE)
-      fp <- file.path(save_file)
-      list <- fromJSON(file = fp)
-      file.remove(save_file)  
-      
-      for (j in c(1:length(list$items))){
-        temp<-data.frame(
-          artist=getArtistsOutput[i,1],
-          artist_id=getArtistsOutput[i,2], 
-          album=list$items[[j]]$name,
-          album_id=list$items[[j]]$id
-        )
-        albums<-rbind(albums, temp)
-      }
-    }
-  }
+
   if (cleanDups==TRUE){albums<-albums[!duplicated(albums$album), ]}
   return(albums)
 }
+
 
 
 
@@ -195,12 +126,13 @@ getArtistsAlbums<-function(getArtistsOutput, country="GB", albumType="album", cl
 
 getAlbumsTracks<-function(getArtistsAlbumsOutput) {
   
-  if (Sys.info()[1]=="Windows"){  
+#   if (Sys.info()[1]=="Windows"){  
     
     albumtracks<-data.frame(artist=NULL,artist_id=NULL,album=NULL, album_id=NULL, track=NULL, track_id=NULL, track_number=NULL, track_length=NULL, preview_url=NULL)
     
     for (i in c(1:nrow(getArtistsAlbumsOutput))) {
-      eval(parse(text=paste0("list<-fromJSON(file=\"https://api.spotify.com/v1/albums/", getArtistsAlbumsOutput[i,4], "/tracks?limit=50\")")))
+      url<-paste0("https://api.spotify.com/v1/albums/", getArtistsAlbumsOutput[i,4], "/tracks?limit=50")
+      list<-content(GET(url))
       
       for (j in c(1:length(list$items))){
         temp<-data.frame(
@@ -212,45 +144,14 @@ getAlbumsTracks<-function(getArtistsAlbumsOutput) {
           track_id=list$items[[j]]$id,
           track_number=list$items[[j]]$track_number,
           track_length=format(.POSIXct(list$items[[j]]$duration_ms/1000,tz="GMT"), "%M:%S"),
-          preview_url=list$items[[j]]$preview_url
+          preview_url=ifelse(is.null(list$items[[j]]$preview_url), "NO PREVIEW", list$items[[j]]$preview_url)
         )
         albumtracks<-rbind(albumtracks, temp)
       }
     }  
-  }
   
-  
-  else {  
-    albumtracks<-data.frame(artist=NULL,artist_id=NULL,album=NULL, album_id=NULL, track=NULL, track_id=NULL, track_number=NULL, track_length=NULL, preview_url=NULL)
-    
-    for (i in c(1:nrow(getArtistsAlbumsOutput))) { 
-      eval(parse(text=paste0("url<-'https://api.spotify.com/v1/albums/", getArtistsAlbumsOutput[i,4], "/tracks?limit=50'")))
-      save_file<-'temp.txt'
-      download.file(url, save_file, method = "wget", quiet=TRUE)
-      fp <- file.path(save_file)
-      list <- fromJSON(file = fp)
-      file.remove(save_file)  
-      
-      for (j in c(1:length(list$items))){
-        temp<-data.frame(
-          artist=getArtistsAlbumsOutput[i,1],
-          artist_id=getArtistsAlbumsOutput[i,2], 
-          album=getArtistsAlbumsOutput[i,3], 
-          album_id=getArtistsAlbumsOutput[i,4],          
-          track=list$items[[j]]$name,
-          track_id=list$items[[j]]$id,
-          track_number=list$items[[j]]$track_number,
-          track_length=format(.POSIXct(list$items[[j]]$duration_ms/1000,tz="GMT"), "%M:%S"),
-          preview_url=list$items[[j]]$preview_url
-        )
-        albumtracks<-rbind(albumtracks, temp)
-      }
-    }
-  }
-
   return(albumtracks)
 }
-
 
 
 
